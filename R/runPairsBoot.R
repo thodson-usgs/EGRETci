@@ -101,7 +101,15 @@ runPairsBoot <- function(eList, pairResults,
   xFlux <- rep(NA, nBoot)
   pConc <- rep(NA, nBoot)
   pFlux <- rep(NA, nBoot)
-  
+
+  # TOH on 2019-04-25
+  # Include GFN bootstrap results
+  xConcQTC <- rep(NA, nBoot)
+  xFluxQTC <- rep(NA, nBoot)
+  xConcCQTC <- rep(NA, nBoot)
+  xFluxCQTC <- rep(NA, nBoot)
+  # end TOH
+
   #
   regDeltaConc <- pairResults$x22[1] - pairResults$x11[1]
   estC <- regDeltaConc
@@ -117,6 +125,14 @@ runPairsBoot <- function(eList, pairResults,
   LFluxDiff <- log(pairResults$x22[2]) - log(pairResults$x11[2])
   fcc <- format(regDeltaConc, digits = 3, width = 7)
   ffc <- format(regDeltaFlux, digits = 3, width = 8)
+
+  # TOH on 2019-04-25
+  QStartDate <- localDaily$Date[1]
+  numQDays <- length(localDaily$Date)
+  QEndDate <- localDaily$Date[numQDays]
+  Daily0 <- localDaily[localDaily$Date >= QStartDate & localDaily$Date <= QEndDate, ]
+  # end TOH
+
   Daily1 <- localDaily[localDaily$Date >= as.Date(dateInfo$flowNormStart[1]) & localDaily$Date <= 
                          as.Date(dateInfo$flowNormEnd[1]), ]
   Daily2 <- localDaily[localDaily$Date >= as.Date(dateInfo$flowNormStart[2]) & localDaily$Date <= 
@@ -160,12 +176,43 @@ runPairsBoot <- function(eList, pairResults,
       
       xConc_here <- (2 * regDeltaConc) - (c22 - c11)
       xFlux_here <- (2 * regDeltaFlux) - (f22 - f11)
+
+      # TOH on 2019-04-25
+      DailyRS1FD0 <- estDailyFromSurfaces(eList, localsurfaces = surfaces1, 
+                                          localDaily = Daily0)
+      annualFlex <- setupYears(DailyRS1FD0, paLong = paLong, paStart = paStart)
+      c10 <- mean(annualFlex$FNConc, na.rm = TRUE)
+      f10 <- mean(annualFlex$FNFlux, na.rm = TRUE) * 0.00036525
+      DailyRS2FD0 <- estDailyFromSurfaces(eList, localsurfaces = surfaces2, 
+                                          localDaily = Daily0)
+      annualFlex <- setupYears(DailyRS2FD0, paLong = paLong, paStart = paStart)
+      c20 <- mean(annualFlex$FNConc, na.rm = TRUE)
+      f20 <- mean(annualFlex$FNFlux, na.rm = TRUE) * 0.00036525
+      
+      # CQTC bootstrap delta
+      regfRSpart <- (pairResults$x20[2] - pairResults$x10[2]) 
+      regcRSpart <- (pairResults$x20[1] - pairResults$x10[1]) 
+      xConcCQTC_here <- (2 * regcRSpart) - (c20 - c10)
+      xFluxCQTC_here <- (2 * regfRSpart) - (f20 - f10)
+      
+      # QTC bootstrap delta
+      regcFDpart <- regDeltaConc - regfRSpart
+      regfFDpart <- regDeltaFlux - regcRSpart
+      xConcQTC_here <- (2 * regcFDpart) - (c22 - c11 - c20 + c10)
+      xFluxQTC_here <- (2 * regfFDpart) - (f22 - f11 - f20 + f10)
+      # end TOH
       
       if(!is.na(xConc_here) & !is.na(xFlux_here)){
         nBootGood <- nBootGood + 1
       
         xConc[nBootGood] <- xConc_here
         xFlux[nBootGood] <- xFlux_here
+	# TOH on 2019-04-25
+	xConcQTC[nBootGood] <- xConcQTC_here
+        xFluxQTC[nBootGood] <- xFluxQTC_here
+	xConcCQTC[nBootGood] <- xConcCQTC_here
+        xFluxCQTC[nBootGood] <- xFluxCQTC_here
+	# end TOH
         LConc <- (2 * LConcDiff) - (log(c22) - log(c11))
         pConc[nBootGood] <- (100 * exp(LConc)) - 100
         LFlux <- (2 * LFluxDiff) - (log(f22) - log(f11))
@@ -270,8 +317,15 @@ runPairsBoot <- function(eList, pairResults,
                                                             width = 30))
   pConc <- as.numeric(na.omit(pConc))
   pFlux <- as.numeric(na.omit(pFlux))
+  xConcQTC <- as.numeric(na.omit(xConcQTC))
+  xFluxQTC <- as.numeric(na.omit(xFluxQTC))
+  xConcCQTC <- as.numeric(na.omit(xConcCQTC))
+  xFluxCQTC <- as.numeric(na.omit(xFluxCQTC))
+
   pairsBootOut <- list(bootOut = bootOut, wordsOut = wordsOut, 
                 xConc = xConc, xFlux = xFlux, pConc = pConc, pFlux = pFlux,
+		xConcQTC = xConcQTC, xFluxQTC = xFluxQTC, # TOH
+		xConcCQTC = xConcCQTC, xFluxCQTC = xFluxCQTC, # TOH
                 startSeed = startSeed)
   attr(pairsBootOut, "year1") <- year1
   attr(pairsBootOut, "year2") <- year2
